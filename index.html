@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>terracuda by willcrichton</title>
+    <title>Terracuda by willcrichton</title>
     <link rel="stylesheet" href="stylesheets/styles.css">
     <link rel="stylesheet" href="stylesheets/pygment_trac.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
@@ -31,7 +31,7 @@
 
       <section>
         <div id="title">
-          <h1>terracuda</h1>
+          <h1>Terracuda</h1>
           <p>A high-level API for low-level parallelism in Lua</p>
           <hr>
           <span class="credits left">Project maintained by <a href="https://github.com/willcrichton">willcrichton</a></span>
@@ -39,36 +39,108 @@
         </div>
 
         <h3>
-<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
+<a name="summary" class="anchor" href="#summary"><span class="octicon octicon-link"></span></a>Summary</h3>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+<p>We will create a CUDA API for Lua aimed at programmers unfamiliar with GPU-level parallelism.</p>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
+<h3>
+<a name="background" class="anchor" href="#background"><span class="octicon octicon-link"></span></a>Background</h3>
+
+<p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. Traditionally, languages like Lua find themselves abstracted miles above low-level parallel frameworks like <a href="http://www.nvidia.com/object/cuda_home_new.html">CUDA</a>, and consequently GPU parallelism was limited to programmers using a systems language like C++. Frameworks like <a href="http://terralang.org/">Terra</a>, however, work to close that gap, making low-level programming accessible in a high-level interface. However, these interfaces still require a number of calls to C libraries and intimate knowledge of the CUDA library. For example, the following code runs a simple CUDA kernel in Terra:</p>
+
+<pre><code>terra foo(result : &amp;float)
+    var t = tid()
+    result[t] = t
+end
+
+local R = terralib.cudacompile({ bar = foo })
+
+terra run_cuda_code(N : int)
+    var data : &amp;float
+    C.cudaMalloc([&amp;&amp;opaque](&amp;data),sizeof(float)*N)
+    var launch = terralib.CUDAParams { 1,1,1, N,1,1, 0, nil }
+    R.bar(&amp;launch,data)
+    var results : &amp;float = [&amp;float](C.malloc(sizeof(float)*N))
+    C.cudaMemcpy(results,data,sizeof(float)*N,2)
+    return results;
+end
+
+results = run_cuda_code(16)
 </code></pre>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+<p>Other high-level CUDA bindings like <a href="http://documen.tician.de/pycuda/">PyCUDA</a> and <a href="http://www.jcuda.org/samples/samples.html">JCuda</a> suffer the same problem.</p>
 
 <h3>
-<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Designer Templates</h3>
+<a name="the-challenge" class="anchor" href="#the-challenge"><span class="octicon octicon-link"></span></a>The Challenge</h3>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+<p>The problem is challenging foremost on the level of architecture. Designing an API is never easy, and attempting to expose GPU-level parallelism to a language as high-level as Lua requires a great deal of care to be usable while still being useful. Creating such an API requires significant knowledge of the abstraction layers between Lua, C, and CUDA as well as knowledge of the typical use cases for high-level parallelism. </p>
 
-<h3>
-<a name="rather-drive-stick" class="anchor" href="#rather-drive-stick"><span class="octicon octicon-link"></span></a>Rather Drive Stick?</h3>
-
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<p>My partner and I know neither Terra nor LLVM (which Terra compiles to), so creating these high-level bindings requires a great deal of initial investment. The existing interface between Terra and CUDA is sketchy at best, so we will need to implement significant new functionality into Terra in order for the Circle Renderer to function properly.</p>
 
 <h3>
-<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<a name="resources" class="anchor" href="#resources"><span class="octicon octicon-link"></span></a>Resources</h3>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+<p>For machines, we'll just be using any computers equipped with NVIDIA GPUs (i.e. Will's laptop and the Gates 5k machines). No other special hardware/software will be needed. We'll be building upon the Terra language and also using <a href="http://luagl.sourceforge.net/">LuaGL</a> for some of the demos.</p>
 
 <h3>
-<a name="support-or-contact" class="anchor" href="#support-or-contact"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+<a name="goals" class="anchor" href="#goals"><span class="octicon octicon-link"></span></a>Goals</h3>
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
+<p>The project has three main areas: writing the API, creating programs using the API, and benchmarking the code against other languages/compilers.</p>
+
+<p>We plan to achieve:</p>
+
+<ul>
+<li>
+<strong>Writing the API</strong>
+
+<ul>
+<li>Allow arbitrary Lua code to be executed in the GPU over a table.</li>
+<li>Optimize threads/warp usage to the input data.</li>
+<li>Abstract the API such that the user needs no C libraries and as little Terra as possible.</li>
+</ul>
+</li>
+<li>
+<strong>Creating programs</strong>
+
+<ul>
+<li>Make a simple saxpy</li>
+<li>Write matrix operations like transpose or pseudoinverse/SVD</li>
+<li>Port the Assignment 2 Circle Renderer over to vanilla Lua (using LuaGL)</li>
+</ul>
+</li>
+<li>
+<strong>Benchmarking</strong>
+
+<ul>
+<li>For each program, benchmark it against equivalent implementations in: vanilla Lua, Terra without CUDA, and C.</li>
+</ul>
+</li>
+</ul><p>We hope to achieve:</p>
+
+<ul>
+<li>Achieve better performance than vanilla C.</li>
+<li>Implement shared memory in Terra.</li>
+<li>Implement linking against libraries like <a href="https://developer.nvidia.com/cublas">cublas</a>.</li>
+</ul><h3>
+<a name="platform" class="anchor" href="#platform"><span class="octicon octicon-link"></span></a>Platform</h3>
+
+<p>CUDA makes sense as we've already learned it in class, and Lua makes sense as Terra already laid the foundation for abstracting systems-level code.</p>
+
+<h3>
+<a name="schedule" class="anchor" href="#schedule"><span class="octicon octicon-link"></span></a>Schedule</h3>
+
+<ul>
+<li>
+<strong>Friday, April 11</strong>: finish map primitives (ie any Lua code and map over a Lua table in CUDA). Write saxpy and corresponding benchmarks.</li>
+<li>
+<strong>Friday, April 18</strong>: complete Terracuda API. Write matrix code and benchmarks.</li>
+<li>
+<strong>Friday, April 25</strong>: Port over Circle Renderer and benchmarks. Gather all requisite data and perform preliminary analysis.</li>
+<li>
+<strong>Friday, May 2</strong>: Optimize/refactor API based on code written and data found. Search for possible performance gains in the abstraction layer. Attempt to implement library linking.</li>
+<li>
+<strong>Friday, May 9</strong>: create writeup based on finalized API. Add any remaining features, time permitting (.g. shared memory).</li>
+</ul>
       </section>
 
     </div>
