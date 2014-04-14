@@ -13,7 +13,7 @@ local C = terralib.includecstring [[
 #include <stdio.h>
 ]]
 
-local NUM_THREADS = 64
+local NUM_THREADS = 128
 
 local cuda_data = global(&double)
 local cuda_params = global(&Params)

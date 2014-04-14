@@ -116,8 +116,8 @@ terra load_scene(scene : int)
       params.num_circles = 3
 
    elseif scene == 1 then
-      var N = 10000
-      var depths : double[10000]
+      var N = 1000
+      var depths : double[1000]
 
       for i = 0, N do
          depths[i] = rand()
