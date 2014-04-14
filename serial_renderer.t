@@ -57,4 +57,6 @@ renderer.get_image = terra(params : Params)
    end
 end
 
+renderer.destroy = terra() end
+
 return renderer

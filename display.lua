@@ -55,6 +55,7 @@ end
 
 function keyboard(key)
    if key == 27 then
+      renderer.destroy()
       glutDestroyWindow(window)
       os.exit(0)
    end

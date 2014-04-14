@@ -46,11 +46,34 @@ terra init(params : Params)
    C.cudaMemcpy(cuda_params, &p, sizeof(Params), 1)
 end
 
-terra shade_pixel()
+terra shade_pixel(params : &Params)
    var idx : int = thread_id() + block_id() * block_dim()
    
-   for i = 0, 4 do
-      cuda_params.data[idx * 4 + i] = 1.0
+   var invWidth = 1.0 / params.width
+   var invHeight = 1.0 / params.height
+
+   var cx = invWidth * ([int](idx % params.width) + 0.5)
+   var cy = invHeight * ([int](idx / params.width) + 0.5)
+
+   for i = 0, params.num_circles do
+      var position = &params.position[i * 3]
+      var radius = params.radius[i]
+      var color = &params.color[i * 3]
+
+      var diffX = position[0] - cx
+      var diffY = position[1] - cy
+      var pixelDist = diffX * diffX + diffY * diffY
+      
+      if (pixelDist <= radius * radius) then
+         for j = 0, 4 do
+            var k = idx * 4 + j
+            if j < 3 then
+               params.data[k] = 0.5 * color[j] + 0.5 * params.data[k]
+            elseif params.data[k] + 0.5 <= 1.0 then
+               params.data[k] = 0.5 + params.data[k]
+            end
+         end
+      end
    end
 end
 
@@ -67,9 +90,15 @@ renderer.get_image = terra(params : Params)
    C.cudaMemcpy(cuda_data, params.data, sizeof(double) * N * 4, 1)
    
    var launch = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
-   kernel.shade_pixel(&launch)
+   kernel.shade_pixel(&launch, cuda_params)
+   C.cudaThreadSynchronize()
    
    C.cudaMemcpy(params.data, cuda_data, sizeof(double) * N * 4, 2)
+end
+
+renderer.destroy = terra()
+   C.cudaFree(cuda_params)
+   C.cudaFree(cuda_data)
 end
 
 return renderer
