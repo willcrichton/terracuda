@@ -38,13 +38,13 @@
           <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
         </div>
 
-        <h3>
-<a name="summary" class="anchor" href="#summary"><span class="octicon octicon-link"></span></a>Summary</h3>
+        <h2>
+<a name="summary" class="anchor" href="#summary"><span class="octicon octicon-link"></span></a>Summary</h2>
 
 <p>We will create a CUDA API for Lua aimed at programmers unfamiliar with GPU-level parallelism.</p>
 
-<h3>
-<a name="background" class="anchor" href="#background"><span class="octicon octicon-link"></span></a>Background</h3>
+<h2>
+<a name="background" class="anchor" href="#background"><span class="octicon octicon-link"></span></a>Background</h2>
 
 <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. Traditionally, languages like Lua find themselves abstracted miles above low-level parallel frameworks like <a href="http://www.nvidia.com/object/cuda_home_new.html">CUDA</a>, and consequently GPU parallelism was limited to programmers using a systems language like C++. Frameworks like <a href="http://terralang.org/">Terra</a>, however, work to close that gap, making low-level programming accessible in a high-level interface. However, these interfaces still require a number of calls to C libraries and intimate knowledge of the CUDA library. For example, the following code runs a simple CUDA kernel in Terra:</p>
 
@@ -70,20 +70,20 @@ results = run_cuda_code(16)
 
 <p>Other high-level CUDA bindings like <a href="http://documen.tician.de/pycuda/">PyCUDA</a> and <a href="http://www.jcuda.org/samples/samples.html">JCuda</a> suffer the same problem.</p>
 
-<h3>
-<a name="the-challenge" class="anchor" href="#the-challenge"><span class="octicon octicon-link"></span></a>The Challenge</h3>
+<h2>
+<a name="the-challenge" class="anchor" href="#the-challenge"><span class="octicon octicon-link"></span></a>The Challenge</h2>
 
 <p>The problem is challenging foremost on the level of architecture. Designing an API is never easy, and attempting to expose GPU-level parallelism to a language as high-level as Lua requires a great deal of care to be usable while still being useful. Creating such an API requires significant knowledge of the abstraction layers between Lua, C, and CUDA as well as knowledge of the typical use cases for high-level parallelism. </p>
 
 <p>My partner and I know neither Terra nor LLVM (which Terra compiles to), so creating these high-level bindings requires a great deal of initial investment. The existing interface between Terra and CUDA is sketchy at best, so we will need to implement significant new functionality into Terra in order for the Circle Renderer to function properly.</p>
 
-<h3>
-<a name="resources" class="anchor" href="#resources"><span class="octicon octicon-link"></span></a>Resources</h3>
+<h2>
+<a name="resources" class="anchor" href="#resources"><span class="octicon octicon-link"></span></a>Resources</h2>
 
 <p>For machines, we'll just be using any computers equipped with NVIDIA GPUs (i.e. Will's laptop and the Gates 5k machines). No other special hardware/software will be needed. We'll be building upon the Terra language and also using <a href="http://luagl.sourceforge.net/">LuaGL</a> for some of the demos.</p>
 
-<h3>
-<a name="goals" class="anchor" href="#goals"><span class="octicon octicon-link"></span></a>Goals</h3>
+<h2>
+<a name="goals" class="anchor" href="#goals"><span class="octicon octicon-link"></span></a>Goals</h2>
 
 <p>The project has three main areas: writing the API, creating programs using the API, and benchmarking the code against other languages/compilers.</p>
 
@@ -121,13 +121,16 @@ results = run_cuda_code(16)
 <li>Achieve better performance than vanilla C.</li>
 <li>Implement shared memory in Terra.</li>
 <li>Implement linking against libraries like <a href="https://developer.nvidia.com/cublas">cublas</a>.</li>
-</ul><h3>
-<a name="platform" class="anchor" href="#platform"><span class="octicon octicon-link"></span></a>Platform</h3>
+</ul><h2>
+<a name="platform" class="anchor" href="#platform"><span class="octicon octicon-link"></span></a>Platform</h2>
 
 <p>CUDA makes sense as we've already learned it in class, and Lua makes sense as Terra already laid the foundation for abstracting systems-level code.</p>
 
+<h2>
+<a name="schedule" class="anchor" href="#schedule"><span class="octicon octicon-link"></span></a>Schedule</h2>
+
 <h3>
-<a name="schedule" class="anchor" href="#schedule"><span class="octicon octicon-link"></span></a>Schedule</h3>
+<a name="original-schedule" class="anchor" href="#original-schedule"><span class="octicon octicon-link"></span></a>Original schedule</h3>
 
 <ul>
 <li>
@@ -140,6 +143,51 @@ results = run_cuda_code(16)
 <strong>Friday, May 2</strong>: Optimize/refactor API based on code written and data found. Search for possible performance gains in the abstraction layer. Attempt to implement library linking.</li>
 <li>
 <strong>Friday, May 9</strong>: create writeup based on finalized API. Add any remaining features, time permitting (.g. shared memory).</li>
+</ul><h3>
+<a name="new-schedule" class="anchor" href="#new-schedule"><span class="octicon octicon-link"></span></a>New schedule</h3>
+
+<ul>
+<li>
+<strong>Wednesday, April 23</strong>: implement generic kernel/variable and reduce primitives (Will).</li>
+<li>
+<strong>Sunday, April 27</strong>: finish implementing optimizations in circle renderer (Patrick).</li>
+<li>
+<strong>Wednesday, April 30</strong>: finish refactors to API. Add shared/constant memory if possible (Will).</li>
+<li>
+<strong>Sunday, May 3</strong>: finish benchmarking all programs. Gather and graph data. (Patrick).</li>
+<li>
+<strong>Wednesday, May 7</strong>: complete write-up (Will and Patrick). Time permitting, make more demos.</li>
+</ul><h2>
+<a name="checkpoint" class="anchor" href="#checkpoint"><span class="octicon octicon-link"></span></a>Checkpoint</h2>
+
+<p>The project is proceeding mostly according to plan. Here's the highlights:</p>
+
+<ul>
+<li>Because of some troubles with installation/setup/learning overhead, the API is not as close to completion as it should be. That said, as you can see in the Github repo we have made significant progress in creating a high-level CUDA API. We have multiple flavors of a map primitive (which is the basic underpinning of any CUDA program). Soon we'll have support for managing multiple variables/kernels within a CUDA program instead of a single list. </li>
+<li>
+<p>We've benchmarked a basic program and seen some cool performance gains. We ran the following code over an array length 100k</p>
+
+<pre><code>terra do_work(x : int) : int
+   var y : int = 0
+   for i = 0, 10000 do
+      if i % 3 == 0 or i % 5 == 0 then
+         y = y + 1
+      end
+   end
+   return x + y
+end
+</code></pre>
+
+<p>And we found speedups of 7.6x over JIT'd Terra, 14.34x over native C, and within 0.95x of hand-rolled CUDA. And the mapping API is really easy to use, it just looks like:</p>
+
+<pre><code>local kernel = cuda.lua_map(do_work)
+kernel(some_list)
+</code></pre>
+
+<p>And <code>some_list</code> gets modified in-place. </p>
+</li>
+<li>After a lot of blood and tears, we managed to port the serial and CUDA circle renderers to Lua (so we are ahead of schedule in that respect!). We still need to implement the optimizations from asst2 (e.g. quadtree data structure on the circles) and change it to use more of our newly minted API, but that should come quickly in the next few weeks. For the competition, we'll show off the circle renderer and any other examples we may come up with before then. We'll also have graphs comparing speed and code size using our API. </li>
+<li>At this point, most of the work is just programming and any further API design as our needs develop. We're not facing any serious issues at this point. </li>
 </ul>
       </section>
 
