@@ -1,4 +1,5 @@
 require "luagl"
+local cuda = terralib.require("cudalib")
 
 struct Params { 
    radius: &double,
@@ -55,7 +56,11 @@ end
 
 function keyboard(key)
    if key == 27 then
-      renderer.destroy()
+      cuda.free(params.radius)
+      cuda.free(params.color)
+      cuda.free(params.position)
+      cuda.free(params.data)
+
       glutDestroyWindow(window)
       os.exit(0)
    end
@@ -65,7 +70,7 @@ local C = terralib.includec('stdlib.h')
 terra update_params(w : int, h : int)
    params.width = w
    params.height = h
-   params.data = [&double](C.malloc(sizeof(double) * 4 * w * h))
+   params.data = [&double](cuda.alloc(sizeof(double) * 4 * w * h))
 end
 
 function resize(w, h)
@@ -85,9 +90,9 @@ end
 
 terra load_scene(scene : int)
    if scene == 0 then
-      params.radius = [&double](C.malloc(sizeof(double) * 3))
-      params.position = [&double](C.malloc(sizeof(double) * 9))
-      params.color = [&double](C.malloc(sizeof(double) * 9))
+      params.radius = [&double](cuda.alloc(sizeof(double) * 3))
+      params.position = [&double](cuda.alloc(sizeof(double) * 9))
+      params.color = [&double](cuda.alloc(sizeof(double) * 9))
 
       params.radius[0] = 0.3
       params.radius[1] = 0.3
@@ -131,9 +136,9 @@ terra load_scene(scene : int)
          end
       end
 
-      params.radius = [&double](C.malloc(sizeof(double) * N))
-      params.position = [&double](C.malloc(sizeof(double) * 3 * N))
-      params.color = [&double](C.malloc(sizeof(double) * 3 * N))
+      params.radius = [&double](cuda.alloc(sizeof(double) * N))
+      params.position = [&double](cuda.alloc(sizeof(double) * 3 * N))
+      params.color = [&double](cuda.alloc(sizeof(double) * 3 * N))
       params.num_circles = N
 
       for i = 0, N do
