@@ -5,10 +5,14 @@ struct Params {
    radius: &double,
    position: &double,
    color: &double,
-   num_circles : int, 
-   width : int,
-   height : int,
-   data : &double }
+   num_circles: int, 
+   width: int,
+   height: int,
+   data: &double,
+   tree: &int,
+   node_size: &int,
+   tree_dim: int,
+   tree_threshold: double }
 
 local window
 local frame_time
@@ -27,7 +31,7 @@ function display()
 
    -- get pixel data from the given renderer
    renderer.get_image(params:get())
-   for i = 0, width * height * 4 - 1 do
+   for i = 0, width * height * 4 - 1  do
       data[i] = get_pixel(i)
    end
 
@@ -60,6 +64,8 @@ function keyboard(key)
       cuda.free(params.color)
       cuda.free(params.position)
       cuda.free(params.data)
+      cuda.device_free(params.tree)
+      cuda.device_free(params.node_size)
 
       glutDestroyWindow(window)
       os.exit(0)
@@ -67,10 +73,15 @@ function keyboard(key)
 end
 
 local C = terralib.includec('stdlib.h')
+local Cio = terralib.includec('stdio.h')
 terra update_params(w : int, h : int)
    params.width = w
    params.height = h
    params.data = [&double](cuda.alloc(sizeof(double) * 4 * w * h))
+
+   var dim_sq = sizeof(int) * params.tree_dim * params.tree_dim
+   params.tree = cuda.alloc_device(dim_sq * params.num_circles)
+   params.node_size = cuda.alloc_device(dim_sq)
 end
 
 function resize(w, h)
@@ -89,6 +100,10 @@ terra rand()
 end
 
 terra load_scene(scene : int)
+   params.tree_threshold = 0.125
+   --params.tree_dim = [math.floor(math.sqrt(math.pow(4.0, math.log(1.0 / 0.125) / math.log(2))))]
+   params.tree_dim = 8
+   
    if scene == 0 then
       params.radius = [&double](cuda.alloc(sizeof(double) * 3))
       params.position = [&double](cuda.alloc(sizeof(double) * 9))

@@ -109,7 +109,7 @@ end
 
 local arrays = {}
 cuda.alloc = terralib.cast(int -> &int, function(N)
-   local init_host = terra() return C.malloc(N) end
+   local init_host = terra() return [&int](C.malloc(N)) end
    local init_cuda = terra()
       var cuda_arr : &int
       C.cudaMalloc([&&opaque](&cuda_arr), N)
@@ -133,6 +133,16 @@ cuda.free = function(ptr)
           free()
        end
    end
+end
+
+cuda.alloc_device = terra(N : int) : &int
+   var cuda_arr : &int
+   C.cudaMalloc([&&opaque](&cuda_arr), N)
+   return cuda_arr
+end
+
+cuda.device_free = terra(ptr : &opaque)
+   C.cudaFree(ptr)
 end
 
 --[[terra wtf()
@@ -164,8 +174,7 @@ cuda.make_kernel = function(func)
    local cuda_params = init()
 
    local func_wrapper = terra(A : sptr_type) 
-      var idx = thread_id() + block_id() * block_dim()
-      func(A, idx)
+      func(A, thread_id() + block_id() * block_dim())
    end
 
    local kernel = terralib.cudacompile({kernel = func_wrapper}).kernel
@@ -173,13 +182,18 @@ cuda.make_kernel = function(func)
    return function(p, N)
       for _, entry in pairs(s_type.entries) do
          if entry.type:ispointer() then
+            local found = false
             for _, v in pairs(arrays) do
                if v.host == p[entry.field] then
                   params[entry.field] = terralib.cast(entry.type, v.cuda)
                   local copy = terra() C.cudaMemcpy(v.cuda, v.host, v.size, 1) end
                   copy()
+                  found = true
+                  break
                end
             end
+
+            if not found then params[entry.field] = p[entry.field] end
          else
             params[entry.field] = p[entry.field]
          end
@@ -215,9 +229,8 @@ terra mah_kernel(x : &A, idx : int)
    x.q[idx] = idx + 1
 end
 
-local some_func = cuda.make_kernel(mah_kernel)
+--[[local some_func = cuda.make_kernel(mah_kernel)
 
---local vv = lul()
 terra asdf()
    var huh : A
    huh.q = cuda.alloc(sizeof(int) * 64)
@@ -229,6 +242,6 @@ terra asdf()
    end
 end
 
--- asdf()
+]]--
 
 return cuda
