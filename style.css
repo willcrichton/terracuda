@@ -10,6 +10,7 @@ body {
     background: url('bg.jpg') no-repeat center center;
     background-size: cover;
     width: 100%;
+    min-height: 800px;
 }
 
 #logo {
