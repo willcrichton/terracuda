@@ -9,16 +9,18 @@ local C = terralib.includecstring [[
 local thread_id = cudalib.nvvm_read_ptx_sreg_tid_x
 local block_dim = cudalib.nvvm_read_ptx_sreg_ntid_x
 local block_id = cudalib.nvvm_read_ptx_sreg_ctaid_x
-local __syncthreads = cudalib.cuda_syncthreads
-local NUM_THREADS = 64
 
+local NUM_THREADS = 64
 local cuda = {}
 
+cuda.index = terra()
+   return thread_id() + block_id() * block_dim()
+end
+
 cuda.make_map_kernel = function(func)
-   local ltype = func:gettype().parameters[1]
+   local ltype = func:gettype().parameters[1].type
    local kernel = terra(device_arr : &ltype)
-      var idx = thread_id() + block_id() * block_dim()
-      device_arr[idx] = func(device_arr[idx])
+      func(device_arr, cuda.index())
    end
 
    return terralib.cudacompile({kernel = kernel}).kernel
@@ -26,17 +28,22 @@ end
 
 cuda.map = function(func)
    local mapper = cuda.make_map_kernel(func)
-   local ltype = func:gettype().parameters[1]
+   local ltype = func:gettype().parameters[1].type
 
    return terra(host_arr : &ltype, N : int)
       var cuda_arr : &ltype
-      var params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
-      
+      var params : terralib.CUDAParams
+      if N < NUM_THREADS then
+         params = terralib.CUDAParams { 1,1,1, N,1,1, 0, nil }
+      else
+         params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+      end
+
       C.cudaMalloc([&&opaque](&cuda_arr), sizeof(ltype) * N)
       C.cudaMemcpy(cuda_arr, host_arr, sizeof(ltype) * N, 1)
       mapper(&params, cuda_arr)
-      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
       C.cudaDeviceSynchronize()
+      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
    end
 end
 
@@ -53,21 +60,22 @@ cuda.fixed_map = function(func, host_arr, N)
    local cuda_arr = init()
    return terra()
       var params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+      
       C.cudaMemcpy(cuda_arr, host_arr, sizeof(ltype) * N, 1)
       mapper(&params, cuda_arr)
-      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
       C.cudaDeviceSynchronize()
+      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
    end
 end
 
 cuda.lua_map = function(func)
    local map = cuda.map(func)
-   local ltype = func:gettype().parameters[1]
-
+   local ltype = func:gettype().parameters[1].type -- assume first arg is array
+   
    local new = terra(N : int) return C.malloc(sizeof(ltype) * N) end
    local copy = terra(a : &ltype, b : ltype, i : int) a[i] = b end
-   local launch = terra(a : &ltype, N : int) map(a, N) end
    local get = terra(a : &ltype, i : int) return a[i] end
+   local free = terra(a : &ltype) C.free(a) end
 
    return function(list) 
       local N = #list
@@ -76,36 +84,22 @@ cuda.lua_map = function(func)
          copy(arr, list[i], i - 1)
       end
 
-      launch(arr, N)
+      map(arr, N)
 
       for i = 1, N do
-         list[i] = get(arr, i - 1)
+         local temp = get(arr, i - 1)
+         if ltype:isstruct() then
+            for _, v in pairs(ltype.entries) do
+               list[i][v.field] = temp[v.field]
+            end
+         else
+            list[i] = temp
+         end
       end
+
+      free(arr)
    end
 end
-
-local arr = global(&int)
-terra mapper(n : int) : int
-   return n * 2
-end
-
-local N = 64
-local f = cuda.fixed_map(mapper, arr, N)
-
-terra foo()
-   arr = [&int](C.malloc(sizeof(int) * N))
-   for i = 0, N do
-      arr[i] = i
-   end
-
-   f()
-
-   for i = 0, N do
-      print(arr[i])
-   end
-end
-
--- foo()
 
 local arrays = {}
 cuda.alloc = terralib.cast(int -> &int, function(N)
@@ -119,7 +113,7 @@ cuda.alloc = terralib.cast(int -> &int, function(N)
    local host_arr = init_host()
    local cuda_arr = init_cuda()
    table.insert(arrays, {host = host_arr, cuda = cuda_arr, size = N})
-
+ 
    return host_arr
 end)
 
@@ -145,17 +139,6 @@ cuda.device_free = terra(ptr : &opaque)
    C.cudaFree(ptr)
 end
 
---[[terra wtf()
-   var x : &int
-   cuda.make_array(x, 10)
-end
-
-wtf()
-
---[[
-allocated
-]]--
-
 cuda.make_kernel = function(func)
    -- assume that our function takes one argument which is a ptr to a struct
    local sptr_type = func:gettype().parameters[1]
@@ -174,7 +157,7 @@ cuda.make_kernel = function(func)
    local cuda_params = init()
 
    local func_wrapper = terra(A : sptr_type) 
-      func(A, thread_id() + block_id() * block_dim())
+      func(A, cuda.index())
    end
 
    local kernel = terralib.cudacompile({kernel = func_wrapper}).kernel
@@ -200,9 +183,16 @@ cuda.make_kernel = function(func)
       end
          
       local launch = terra()
-         var launch_params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+         var launch_params : terralib.CUDAParams
+         if N < NUM_THREADS then
+            launch_params = terralib.CUDAParams { 1,1,1, N,1,1, 0, nil }
+         else
+            launch_params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+         end
+         
          C.cudaMemcpy(cuda_params, &params, sizeof(s_type), 1)
          kernel(&launch_params, cuda_params)
+         C.cudaDeviceSynchronize()
          C.cudaMemcpy(&params, cuda_params, sizeof(s_type), 2)
       end
 
@@ -223,25 +213,41 @@ cuda.make_kernel = function(func)
    end      
 end
 
-struct A { p : int[64], q: &int, r: int }
-terra mah_kernel(x : &A, idx : int)
-   x.p[idx] = idx
-   x.q[idx] = idx + 1
-end
+--[[cuda.reduce = function(func)
+   local reduce_type = func:gettype().parameters[1]
+   return function(L)
+      var params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+      C.cudaMemcpy(cuda_arr, host_arr, sizeof(ltype) * N, 1)
+      mapper(&params, cuda_arr)
+      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
+      C.cudaDeviceSynchronize()
 
---[[local some_func = cuda.make_kernel(mah_kernel)
-
-terra asdf()
-   var huh : A
-   huh.q = cuda.alloc(sizeof(int) * 64)
-   
-   some_func(&huh, 64)
-
-   for i = 0, 3 do
-      print(huh.q[i])
+      print(L)
    end
 end
 
+local R = cuda.reduce(terra(a : int, b : int) return a + b end)
+terra lulz()
+   var A : int[3] = array(1, 2, 3)
+   R(A)
+end
+lulz()
 ]]--
+
+cuda.make_struct_type = function(t)
+   local st = terralib.types.newstruct("custom_struct")
+   local type_map = {
+      string = &int8,
+      number = double,
+      boolean = bool
+   }
+
+   for k, v in pairs(t) do
+      table.insert(st.entries, { field = k, type = type_map[type(v)] })
+   end
+
+   return st
+end
+
 
 return cuda

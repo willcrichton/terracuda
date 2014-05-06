@@ -30,7 +30,10 @@ end
 function display()
 
    -- get pixel data from the given renderer
+   local start = os.clock()
    renderer.get_image(params:get())
+   print('Render time: ', os.clock() - start)
+
    for i = 0, width * height * 4 - 1  do
       data[i] = get_pixel(i)
    end
@@ -48,11 +51,6 @@ function display()
    glLoadIdentity()
    glRasterPos2d(0, 0)
    glDrawPixels(width, height, GL_RGBA, GL_FLOAT, data:ptr())
-
-   -- track draw time
-   local new_time = os.clock()
-   print(string.format("frame time: %.2f", new_time - frame_time))
-   frame_time = new_time
 
    glutSwapBuffers()
    glutPostRedisplay()
@@ -99,11 +97,13 @@ terra rand()
    return (C.rand() % 10000) / 10000.0
 end
 
+--   params.tree_threshold = 0.125
+--   params.tree_dim = [math.floor(math.sqrt(math.pow(4.0, math.log(1.0 / 0.125) / math.log(2))))]
+
 terra load_scene(scene : int)
-   params.tree_threshold = 0.125
-   --params.tree_dim = [math.floor(math.sqrt(math.pow(4.0, math.log(1.0 / 0.125) / math.log(2))))]
-   params.tree_dim = 8
-   
+   params.tree_threshold = 0.03125
+   params.tree_dim = 32
+
    if scene == 0 then
       params.radius = [&double](cuda.alloc(sizeof(double) * 3))
       params.position = [&double](cuda.alloc(sizeof(double) * 9))
@@ -136,8 +136,8 @@ terra load_scene(scene : int)
       params.num_circles = 3
 
    elseif scene == 1 then
-      var N = 1000
-      var depths : double[1000]
+      var N = 100000
+      var depths : double[100000]
 
       for i = 0, N do
          depths[i] = rand()

@@ -252,6 +252,27 @@ cuda.lua_make_kernel = function(func)
    end
 end
 
+--[[cuda.reduce = function(func)
+   local reduce_type = func:gettype().parameters[1]
+   return function(L)
+      var params = terralib.CUDAParams { N/NUM_THREADS,1,1, NUM_THREADS,1,1, 0, nil }
+      C.cudaMemcpy(cuda_arr, host_arr, sizeof(ltype) * N, 1)
+      mapper(&params, cuda_arr)
+      C.cudaMemcpy(host_arr, cuda_arr, sizeof(ltype) * N, 2)
+      C.cudaDeviceSynchronize()
+
+      print(L)
+   end
+end
+
+local R = cuda.reduce(terra(a : int, b : int) return a + b end)
+terra lulz()
+   var A : int[3] = array(1, 2, 3)
+   R(A)
+end
+lulz()
+]]--
+
 cuda.make_struct_type = function(t)
    local st = terralib.types.newstruct("custom_struct")
    local type_map = {
