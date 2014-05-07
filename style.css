@@ -11,6 +11,7 @@ body {
     background-size: cover;
     width: 100%;
     min-height: 800px;
+    position: relative;
 }
 
 #logo {
@@ -72,11 +73,20 @@ p {
     margin: 5px 0;
 }
 
-ul {
+ul, ol {
     margin: 5px 20px;
 }
 
 pre { 
     background: #f8f8f8; 
     margin: 20px 0!important;
+}
+
+code[class*="language-"] { color: white; }
+:not(pre) > code[class*="language-"] .token { color: white; }
+pre code[class*="language-"] { color: black; }
+
+img {
+    display: block;
+    margin: 15px auto;
 }

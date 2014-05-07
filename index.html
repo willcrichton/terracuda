@@ -33,7 +33,67 @@
 
       <h1 id="writeup">Writeup</h1>
 
-      <p>Insert a writeup here.</p>
+      <h2>Summary</h2>
+      <p>We created a high-level Lua/Terra API which uses CUDA to execute Terra functions on the GPU. Our API can translate arbitrary Terra code to CUDA code and handles all device memory management and similar issues behind the scenes.</p>
+
+      <h2>Background</h2>
+
+      <p>Writing GPU code is time-consuming. CUDA, the best available language for GPU programming, requires a lot of work from the programmer in order to do even simple tasks. The programmer must remember to keep host memory and device memory in sync. He must calculate the number of threads and warps he needs (and the term "warp" is quite confusing if you haven't heard it before). He must calculate for himself the appropriate index at each instance of his kernel. And most importantly, he can only write GPU code in CUDA!</p>
+      <p>Some APIs like <a href="http://documen.tician.de/pycuda/">PyCUDA</a> and <a href="http://www.jcuda.org/samples/samples.html">JCuda</a> attempted to tackle this problem. Unfortunately, they only address the last point raised above&mdash;one can use CUDA functions in the course of writing a Python program, but it is neither easy nor intuitive. In PyCUDA, for example, one must actually embed CUDA code as a string inside of the Python program (or presumably load it from a file). Terracuda's goal was to abstract away all these issues and let the programmer write GPU code at his convenience.</p>
+
+
+      <h2>Approach</h2>
+      <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. <a href="http://terralang.org">Terra</a> is a language embedded in Lua which gives easier access to low-level functions (e.g. printf).</p>
+
+      <p>Terra has a few key features we used: it JIT-compiles to LLVM, it interoperates with Lua, and its types are treated as values in Lua. This combined with the recent release of NVIDIA's <a href="http://llvm.org/docs/NVPTXUsage.html">NVPTX</a> LLVM backend means that we can easily translate between Terra code and CUDA code. Its interoperation means that any Lua value can be used in Terra code, and its type system means that Lua can generate dynamics types on the fly.</p>
+      <p>Before we delve into the specifics of the API, let's look at a sample implementation of the <code>SAXPY</code> routine in regular Lua and using Terracuda.</p>
+      <div style="overflow: auto; margin-top: 20px;">
+        <div style="float:left;">
+          <strong>Lua</strong>
+          <pre style="margin-top: 5px!important; width: 360px;"><code>local P, N = {X = {}, Y = {}, a = 2.0}, 1000
+-- populate X
+
+for i = 1, N do
+   P.Y[i] = P.A * P.X[i] + P.Y[i]
+end</code></pre>
+        </div>
+        <div style="float:left; margin-left: 20px;">
+          <strong>Terracuda</strong>
+          <pre style="margin-top: 5px!important; width: 360px;"><code>local P, N = {X = {}, Y = {}, a = 2.0}, 1000
+-- populate X
+
+local ptype = cudalib.make_struct_type(P)
+local saxpy = cudalib.make_kernel(
+terra(p : &ptype, i : int)
+   p.Y[i] = p.a * p.X[i] + p.Y[i]
+end)
+
+saxpy(P, N)</code></pre>
+        </div>
+      </div>
+      
+      <p>Both pieces of code above will produce the same output (i.e. <code>P.C</code> will contain the correct values). You may notice, however, that device memory, thread indexing, kernel calls, etc. are all conspicuously absent from the Terracuda code. This is all handled by the API. Here's how it works: consider that you have some table <code>P</code> a Terra function <code>F</code> that operates on <code>P</code> which you want to convert to GPU code. The process is as follows:</p>
+      <ol>
+        <li>Run <code>make_struct_type(P)</code>. Because Terra types are values, Lua can loop through <code>P</code> and generate a new <code>struct</code> type that corresponds exactly with the given input. So in the above <code>SAXPY</code> example, the generated type is <code>struct P { X: &int, Y: &int, a: double }</code>.</li>
+        <li>Run <code>make_kernel(F)</code>. This pre-allocates device memory for every entry inside the struct if possible (the exception being if we have variable length arrays). <code>make_kernel</code> returns a closure over these values which will copy the input into the allocated device memory, run the kernel on the device parameters, and copy the modified memory back to the host. This routine also compiles <code>F</code> to GPU code for later use.</li>
+        <li>Run the result of <code>make_kernel</code> with your input parameters as well as the number of threads <code>N</code> to create.
+      </ol>
+      
+      <p>That's the basics of the API. I'll add more here soon on how each iteration of the API changed.</p>
+
+      <h2>Results</h2>
+      <p>The analysis is promising (and still ongoing!). The API itself works great, so we concerned ourselves mostly with performance and concision. We wrote a myriad of applications in C, CUDA, Terra, and Terracuda ranging from SAXPY to a <a href="http://15418.courses.cs.cmu.edu/spring2014/article/4">circle renderer</a> we wrote for class. For each application, we sampled execution time and also recorded the size of the codebase required for the CUDA implementation versus the Terracuda one. We found the following execution times:</p>
+      <img src="graph1.png" width="600"  />
+      <p>So far, Terracuda (despite being JIT-compiled in a dynamically typed language) is mostly competitive with C and CUDA. In some cases, like with matrix multiplication, it actually performs better than hand-written CUDA! It doesn't work as well, however, on simple programs like <code>SAXPY</code> as the overhead of compiling/spinning up a kernel is greater than any performance gains.</p>
+      <p>Code base comparison also yielded favorable results. Terracuda was consistently less than <code>1/2</code> the size of its CUDA counterpart, which emphasizes the concise nature of both Lua and the API we've created. Granted, lines of code is not a perfect benchmark for good/bad code (since it also includes comments/includes/etc.), but it gives us a good impression of relative code sizes. See the results:</p>
+
+      <img src="graph2.png" width="600"  />
+
+      <h2>References</h2>
+      <p>DeVito, Zachary et al. <em>Terra: A Multi-Stage Language for High-Performance Computing</em>. 2013.</p>
+      
+      <h2>Work done</h2>
+      <p>Equal work was performed by both project members.</p>
 
       <h1 id="checkpoint">Checkpoint</h1>
 
