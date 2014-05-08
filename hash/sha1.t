@@ -34,17 +34,15 @@ end
 
 -- computes the sha1 hash of a single message
 terra sha1_hash(params : &Params, idx : int)
+end
+   --[[
    C.printf("Hashing index: %d\n", idx)
    -- just to be sure
    if idx >= params.num_msgs then
       return 0
    end
 
-   -- number of blocks for this message
-   var num_blocks : int = params.block_lengths[idx]
-   -- starting word for this set of blocks for this message
-   var block_idx : &int = &params.words[params.start_block[idx]]
-   -- every block has its own 160 bit result message digest
+   -- TODO: Pad the message sent to this thread
 
    var mask : int = 0x0000000F
    var H0 : int = 0x67452301
@@ -74,6 +72,8 @@ terra sha1_hash(params : &Params, idx : int)
    end
    C.printf("%d %d %d %d %d\n", H0, H1, H2, H3, H4)
 end
+
+--]]
 
 
 local sha_kernel = cuda.make_kernel(sha1_hash)

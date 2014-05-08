@@ -1,9 +1,6 @@
 struct Params {
-   num_blocks: int,
    num_msgs: int,
-   block_lengths: &int,
-   start_block: &int,
-   words: &int,
+   msgs: &int8,
    result: &int}
 
 local char,rep = string.char, string.rep
@@ -14,6 +11,8 @@ local sha = terralib.require("sha1")
 local total_msgs = 0
 local total_blocks = 0
 local total_len = 0
+
+local lines = {}
 
 local C = terralib.includec('stdlib.h')
 local Cio = terralib.includec('stdio.h')
@@ -58,48 +57,14 @@ function msg_to_blocks(msg)
 end
 
 -- take all messages and pad/pack them into the params struct
-terra pack_and_send(lines : &int8)
-   params.num_msgs = [#lines]
-   params.num_blocks = total_blocks
-   params.num_msgs = total_msgs
-   params.block_lengths = [&int](cuda.alloc(sizeof(int)*total_msgs))
-   params.start_block = [&int](cuda.alloc(sizeof(int)*total_msgs))
-   params.words = [&int](cuda.alloc(sizeof(int)*total_len))
-   -- every message has a 5 word result
-   params.results = [&int](cuda.alloc(sizeof(int)*total_msgs*5))
-   var cur_msg = 0
-   var cur_block = 0
-   var word_index = 0
-
-   for i,v in pairs(lines) do
-         -- blocks contains the padded message
-         params.start_block[cur_msg] = cur_block
-         var blocks = msg_to_blocks(v)
-         for i=0,([#blocks] / 4) do
-            if (word_index)%16 == 0 then
-               cur_block = cur_block + 1
-            end
-            -- most important part
-            var word = bytes_to_word(blocks:byte(word_index, word_index+3))
-            print(word, word_index)
-            params.words[word_index] = word
-            word_index = word_index + 1
-         end
-         params.block_lengths[cur_msg] = [#blocks] / 16
-         cur_block = cur_block + 1
-         cur_msg = cur_msg + 1
-   end
+terra pack_and_send()
+   -- Pad all of the messages out to 512 bits (64 bytes) with 0s
+   Cio.printf("%s\n", )
+   -- TODO: put all of the messages in the params struct
 end
 
 terra hash_all(n : int)
-   sha.hash(params:get())
-
-   -- print it out just to be sure it all hashed I guess
-   for i=0,n do
-         var res : &int = params.results[i*5]
-         Cio.printf("Message #%d hash: (0x)%x %x %x %x %x\n",
-                    i, res[0],res[1],res[2],res[3],res[4])
-   end
+   sha.hash(params)
 end
 
 function file_exists(file)
@@ -109,15 +74,20 @@ function file_exists(file)
 end
 
 function main()
+   print("Hey there squirelly bear")
+   params.num_msgs = 0
    local file = arg[1]
    if not file_exists(file) then return {} end
-   local lines = {}
    for line in io.lines(file) do
          lines[#lines+1] = line
+         params.num_msgs = params.num_msgs + 1
    end
+   print(params.num_msgs)
    print("starting?")
-   pack_and_send(lines)
+   pack_and_send()
    hash_all(#lines)
    print("Done?")
 end
+
+main()
 
