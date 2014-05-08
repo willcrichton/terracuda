@@ -51,7 +51,7 @@
         <div style="float:left;">
           <strong>Lua</strong>
           <pre style="margin-top: 5px!important; width: 360px;"><code>local P, N = {X = {}, Y = {}, a = 2.0}, 1000
--- populate X
+-- populate X and Y
 
 for i = 1, N do
    P.Y[i] = P.A * P.X[i] + P.Y[i]
@@ -60,7 +60,7 @@ end</code></pre>
         <div style="float:left; margin-left: 20px;">
           <strong>Terracuda</strong>
           <pre style="margin-top: 5px!important; width: 360px;"><code>local P, N = {X = {}, Y = {}, a = 2.0}, 1000
--- populate X
+-- populate X and Y
 
 local ptype = cudalib.make_struct_type(P)
 local saxpy = cudalib.make_kernel(
@@ -79,7 +79,7 @@ saxpy(P, N)</code></pre>
         <li>Run the result of <code>make_kernel</code> with your input parameters as well as the number of threads <code>N</code> to create.
       </ol>
       
-      <p>That's the basics of the API. I'll add more here soon on how each iteration of the API changed.</p>
+      <p>That's the basics of the API. I'll add more here soon on how each iteration of the API changed. You can find the source for our project here: <a href="https://github.com/willcrichton/terracuda">https://github.com/willcrichton/terracuda</a></p>
 
       <h2>Results</h2>
       <p>The analysis is promising (and still ongoing!). The API itself works great, so we concerned ourselves mostly with performance and concision. We wrote a myriad of applications in C, CUDA, Terra, and Terracuda ranging from <code>SAXPY</code> to a <a href="http://15418.courses.cs.cmu.edu/spring2014/article/4">circle renderer</a> we wrote for class. For each application, we sampled execution time and also recorded the size of the codebase required for the CUDA implementation versus the Terracuda one. We found the following execution times:</p>
