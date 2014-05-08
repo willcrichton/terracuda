@@ -7,7 +7,6 @@ terra rot_left(x : int, n : int)
 end
 
 terra f(t : int, b : int, c : int , d : int)
-   assert(0 <= t and t < 80)
    if t <= 19 then
       return (b and c) or ((not b) and d)
    elseif t <= 39 then
@@ -20,7 +19,6 @@ terra f(t : int, b : int, c : int , d : int)
 end
 
 terra k(t : int)
-   assert(0 <= t and t < 80)
    if t <= 19 then
       return 0x5A827999
    elseif t <= 39 then
@@ -34,47 +32,42 @@ end
 
 -- computes the sha1 hash of a single message
 terra sha1_hash(params : &Params, idx : int)
-end
    --[[
-   C.printf("Hashing index: %d\n", idx)
+
    -- just to be sure
    if idx >= params.num_msgs then
       return 0
    end
-
-   -- TODO: Pad the message sent to this thread
-
-   var mask : int = 0x0000000F
-   var H0 : int = 0x67452301
-   var H1 : int = 0xEFCDAB89
-   var H2 : int = 0x98BADCFE
-   var H3 : int = 0x10325476
-   var H4 : int = 0xC3D2E1F0
-
-   var W : &int = block_idx
+   var mask : uint = 0x0000000F
+   var H0 : uint = 0x67452301
+   var H1 : uint = 0xEFCDAB89
+   var H2 : uint = 0x98BADCFE
+   var H3 : uint = 0x10325476
+   var H4 : uint = 0xC3D2E1F0
+   var W : &uint = &params.msgs[16*idx]
    -- Process M(i)
-   for i=0,num_blocks do
-      var A, B, C, D, E = H0, H1, H2, H3, H4
-      for t=0,79 do
-         var s : int = t and mask
-         if t >= 16 then
-            W[s] = rot_left(W[(s + 13) and mask] ^ W[(s + 8) and mask] ^
-                               W[(s + 2) and mask] ^ W[s], 1)
-                    end
-            var tmp = rot_left(A, 5) + f(t, B, C, D) + E + W[s] + k(t)
-            E = D
-            D = C
-            C = rot_left(B, 30)
-            B = A
-            A = tmp
+   var A, B, C, D, E = H0, H1, H2, H3, H4
+   for t=0,80 do
+      var s : int = t and mask
+      if t >= 16 then
+          W[s] = rot_left(W[(s + 13) and mask] ^ W[(s + 8) and mask] ^
+                            W[(s + 2) and mask] ^ W[s], 1)
       end
-      H0,H1,H2,H3,H4 = H0 + A, H1 + B, H2 + C, H3 + D, H4 + E
+      var tmp = rot_left(A, 5) + f(t, B, C, D) + E + W[s] + k(t)
+      E = D
+      D = C
+      C = rot_left(B, 30)
+      B = A
+      A = tmp
    end
-   C.printf("%d %d %d %d %d\n", H0, H1, H2, H3, H4)
+   H0,H1,H2,H3,H4 = H0 + A, H1 + B, H2 + C, H3 + D, H4 + E
+   params.results[idx*5 + 0] = H0
+   params.results[idx*5 + 1] = H1
+   params.results[idx*5 + 2] = H2
+   params.results[idx*5 + 3] = H3
+   params.results[idx*5 + 4] = H4
+   --]]
 end
-
---]]
-
 
 local sha_kernel = cuda.make_kernel(sha1_hash)
 
