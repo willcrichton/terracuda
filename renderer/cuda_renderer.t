@@ -11,10 +11,12 @@ terra shade_pixel(params : &Params, idx : int)
    var cy = (idx / params.width + 0.5) / params.height
 
    -- find corresponding leaf in circle tree for our pixel
-   var x = floor(cx / params.tree_threshold) * params.tree_threshold -- cx / params.tree_threshold
+   var x = floor(cx / params.tree_threshold) * params.tree_threshold
    var y = floor(cy / params.tree_threshold) * params.tree_threshold
    var tid = to_int((x + y * params.tree_dim) * params.tree_dim)
    var circles = &params.tree[tid * params.num_circles]
+   var temp : double[4]
+   for j = 0, 4 do temp[j] = params.data[idx * 4 + j] end
 
    -- limit containment test to only circles inside the circle tree region
    for c = 0, params.node_size[tid] do
@@ -30,15 +32,16 @@ terra shade_pixel(params : &Params, idx : int)
       
       if (pixelDist <= radius * radius) then
          for j = 0, 4 do
-            var k = idx * 4 + j
             if j < 3 then
-               params.data[k] = 0.5 * color[j] + 0.5 * params.data[k]
-            elseif params.data[k] + 0.5 <= 1.0 then
-               params.data[k] = 0.5 + params.data[k]
+               temp[j] = 0.5 * color[j] + 0.5 * temp[j]
+            elseif temp[j] + 0.5 <= 1.0 then
+               temp[j] = 0.5 + temp[j]
             end
          end
       end
    end
+
+   for j = 0, 4 do params.data[idx * 4 + j] = temp[j] end
 end
 
 terra clamp(x : double, min : double, max : double)
