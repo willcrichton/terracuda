@@ -5,9 +5,8 @@
 #include <cuda.h>
 
 __global__ void render(char *out, int width, int height) {
-  unsigned int x_dim = blockIdx.x*blockDim.x + threadIdx.x;
-  unsigned int y_dim = blockIdx.y*blockDim.y + threadIdx.y;
-  int index = 3*width*y_dim + x_dim*3;
+  int index = 3 * (blockIdx.x * blockDim.x + threadIdx.x);
+  int x_dim = (index / 3) % width, y_dim = (index / 3) / width;
   float x_origin = ((float) x_dim/width)*3.25 - 2;
   float y_origin = ((float) y_dim/width)*2.5 - 1.25;
 

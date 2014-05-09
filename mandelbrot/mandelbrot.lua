@@ -5,7 +5,7 @@ for y_dim = 1, P.N do
       local x_origin, y_origin = (x_dim / P.N) * 3.25 - 2.0, (y_dim / P.N) * 2.5 - 1.25
       local idx = (y_dim * P.N + x_dim) * 3
       local x, y = 0.0, 0.0
-      local scale = 32
+      local scale = 8
       local iteration, max_iteration = 0, 256 * scale
 
       while x * x + y * y <= 4 and iteration < max_iteration do

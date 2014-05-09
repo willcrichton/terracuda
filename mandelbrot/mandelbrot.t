@@ -33,15 +33,3 @@ terra(p : &stype, idx : int)
 end)
 
 render(P, P.N * P.N)
-
---[[
-io.write(string.format("P3\n%d %d\n255\n", P.N, P.N))
-for row = 0, P.N - 1 do
-   for col = 0, P.N - 1 do
-      for i = 1, 3 do 
-         io.write(string.format("%d ", P.image[(row * P.N + col) * 3 + i]))
-      end
-   end
-   io.write("\n")
-end
-]]--

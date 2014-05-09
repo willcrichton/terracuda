@@ -5,6 +5,13 @@ all:
 #	convert test.ppm test.jpg
 
 cuda:
-	nvcc -arch compute_20 main.cu
+	nvcc -O3 -arch compute_20 mandelbrot.cu
 	time ./a.out
 #	convert test.ppm test.jpg
+#	open test.jpg
+
+c:
+	gcc -O3 mandelbrot.c
+	time ./a.out > test.ppm
+	convert test.ppm test.jpg
+	open test.jpg
