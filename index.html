@@ -43,7 +43,7 @@
 
 
       <h2>Approach</h2>
-      <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. <a href="http://terralang.org">Terra</a> is a language embedded in Lua which gives easier access to low-level functions (e.g. printf).</p>
+      <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. <a href="http://terralang.org">Terra</a> is a language embedded in Lua which gives easier access to low-level functions (e.g. <code>printf</code>).</p>
 
       <p>Terra has a few key features we used: it JIT-compiles to LLVM, it interoperates with Lua, and its types are treated as values in Lua. This combined with the recent release of NVIDIA's <a href="http://llvm.org/docs/NVPTXUsage.html">NVPTX</a> LLVM backend means that we can easily translate between Terra code and CUDA code. Its interoperation means that any Lua value can be used in Terra code, and its type system means that Lua can generate dynamics types on the fly.</p>
       <p>Before we delve into the specifics of the API, let's look at a sample implementation of the <code>SAXPY</code> routine in regular Lua and using Terracuda.</p>
