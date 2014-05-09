@@ -75,22 +75,55 @@ saxpy(P, N)</code></pre>
       <p>Both pieces of code above will produce the same output (i.e. <code>P.C</code> will contain the correct values). You may notice, however, that device memory, thread indexing, kernel calls, etc. are all conspicuously absent from the Terracuda code. This is all handled by the API. Here's how it works: consider that you have some table <code>P</code> a Terra function <code>F</code> that operates on <code>P</code> which you want to convert to GPU code. The process is as follows:</p>
       <ol>
         <li>Run <code>make_struct_type(P)</code>. Because Terra types are values, Lua can loop through <code>P</code> and generate a new <code>struct</code> type that corresponds exactly with the given input. So in the above <code>SAXPY</code> example, the generated type is <code>struct P { X: &int, Y: &int, a: double }</code>.</li>
-        <li>Run <code>make_kernel(F)</code>. This pre-allocates device memory for every entry inside the struct if possible (the exception being if we have variable length arrays). <code>make_kernel</code> returns a closure over these values which will copy the input into the allocated device memory, run the kernel on the device parameters, and copy the modified memory back to the host. This routine also compiles <code>F</code> to GPU code for later use.</li>
+        <li>Run <code>make_kernel(F)</code>. This pre-allocates device memory for every entry inside the struct if possible (the exception being if we have variable length arrays). Then, it JIT-compiles <code>F</code> to CUDA code for later use. Lastly, <code>make_kernel</code> returns a closure over these values which will copy the input into the allocated device memory, run the kernel on the device parameters, and copy the modified memory back to the host.</li>
         <li>Run the result of <code>make_kernel</code> with your input parameters as well as the number of threads <code>N</code> to create.
       </ol>
       
-      <p>That's the basics of the API. I'll add more here soon on how each iteration of the API changed. You can find the source for our project here: <a href="https://github.com/willcrichton/terracuda">https://github.com/willcrichton/terracuda</a></p>
+      <p>This approach gives great freedom to Terracuda users, as essentially any CUDA program can be translated to Terracuda without much trouble. Note that Terracuda is <em>not</em> purely data-parallel&mdash;you can run your kernel over any number of threads with any input! The flexibility of the API has actually changed significantly over time. Initially, we wrote the API just in terms of data-parallel primitives like <code>map</code> and <code>reduce</code>, but over time as we learned more about Terra we realized that it empowers us to write more flexible code, and consequently we added more features to the API like struct type creation. For example, matrix multiply looked like this:
+        <pre><code>local P = {A = {}, B = {}, C = {}, N = 1000}
+-- populate A and B
+
+local stype = cuda.make_struct_type(P)
+local kernel = cuda.make_kernel(
+terra(p : &stype, idx : int)
+   var i, j, sum = idx / p.N, idx % p.N, 0
+   for k = 0, p.N do
+      sum = sum + p.A[i * p.N + k] * p.B[k * p.N + j]
+   end
+
+   p.C[idx] = sum
+end)
+
+kernel(P, P.N * P.N)</code></pre>
+      </p>
+
+      <p>For comparison, the <code>map</code> map primitive looked similar but granted less flexibility. It looked like this:
+        <pre><code>local A = {}
+-- populate A with integers
+
+local kernel = cuda.map(terra(x : int) : int
+   return x + 1
+end)
+
+kernel(A)</code></pre>
+      </p>
+
+      <p>That's the basics of the API. You can find the source for the API  here: <a href="https://github.com/willcrichton/terracuda">https://github.com/willcrichton/terracuda</a></p>
 
       <h2>Results</h2>
-      <p>The analysis is promising (and still ongoing!). The API itself works great, so we concerned ourselves mostly with performance and concision. We wrote a myriad of applications in C, CUDA, Terra, and Terracuda ranging from <code>SAXPY</code> to a <a href="http://15418.courses.cs.cmu.edu/spring2014/article/4">circle renderer</a> we wrote for class. For each application, we sampled execution time and also recorded the size of the codebase required for the CUDA implementation versus the Terracuda one. We found the following execution times:</p>
+      <p>The API itself works great, so we concerned ourselves mostly with performance and concision when considering results. We wrote a myriad of applications in C, CUDA, Terra, and Terracuda ranging from <code>SAXPY</code> to a <a href="http://15418.courses.cs.cmu.edu/spring2014/article/4">circle renderer</a> we wrote for class. For each application, we sampled execution time and also recorded the size of the codebase required for the CUDA implementation versus the Terracuda one. All code was tested on a Mid-2012 Macbook Pro with an NVIDIA GTX 480 GPU. Each program used the input size listed. We found the following execution times:</p>
       <img src="graph1.png" width="800"  />
-      <p>So far, Terracuda (despite being JIT-compiled in a dynamically typed language) is mostly competitive with C and CUDA. In some cases, like with matrix multiplication, it actually performs better than hand-written CUDA! It doesn't work as well, however, on simple programs like <code>SAXPY</code> as the overhead of compiling/spinning up a kernel is greater than any performance gains.</p>
+      <p>So far, Terracuda (despite being JIT-compiled in a dynamically typed language) is mostly competitive with C and CUDA. In some cases, like with matrix multiplication, it actually performs better than hand-written CUDA! It doesn't work as well, however, on simple programs like <code>SAXPY</code> as the overhead of compiling/spinning up a kernel is greater than any performance gains. It's worth noting that Terracuda spends, on average, about 3x as much time booting up its kernel than CUDA, primarily because CUDA programs are precompiled and Terracuda is JIT-compiled, so our API does bring greater overhead (noticeable in the poor results for <code>SAXPY</code>).</p>
+      <p>Experience leads us to believe that the remaining difference between Terracuda and CUDA could be eliminated by implementing support for constant and shared memory annotations. The circle renderer, for example, has a loop over a set of circles that updates an array <code>data</code> for every circle. By switching the updates to <code>data</code> with a temporary array not in global memory which gets copied at the end, we found a 45% decrease in execution time in the Terracuda implementation (from about 2.3s to 1.5s). However, arrays like <code>position</code> and <code>radius</code> are still stored in global memory (as opposed to constant memory as is used in the CUDA version), so CUDA still beats out Terracuda on the circle renderer.</p>
       <p>Code base comparison also yielded favorable results. Terracuda was consistently less than <code>1/2</code> the size of its CUDA counterpart, which emphasizes the concise nature of both Lua and the API we've created. Granted, lines of code is not a perfect benchmark for good/bad code (since it also includes comments/includes/etc.), but it gives us a good impression of relative code sizes. See the results:</p>
 
       <img src="graph2.png" width="800"  />
 
       <h2>References</h2>
-      <p>DeVito, Zachary et al. <em>Terra: A Multi-Stage Language for High-Performance Computing</em>. 2013.</p>
+      <p>DeVito, Zachary et al. <em>Terra: A Multi-Stage Language for High-Performance Computing</em>. 2013. <br />
+        Ierusalimschy, Roberto. <em>Programming in Lua: Third Edition</em>. Lua.org, Jan 2013.
+      </p>
+      
       
       <h2>Work done</h2>
       <p>Equal work was performed by both project members.</p>
