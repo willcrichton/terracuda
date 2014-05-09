@@ -2,19 +2,18 @@
 
 int main() {
   int N = 10000000;
-  int *A = malloc(sizeof(int) * N), 
-      *B = malloc(sizeof(int) * N), 
-      *C = malloc(sizeof(int) * N);
+  int *X = malloc(sizeof(int) * N), 
+      *Y = malloc(sizeof(int) * N), 
+       a = 2;
   
   for (int i = 0; i < N; i++) {
-    A[i] = i;
-    B[i] = N - i;
-    C[i] = 0;
+    X[i] = i;
+    Y[i] = N - i;
   }
 
   for (int i = 0; i < N; i++) {
-    C[i] = A[i] + B[i];
+    Y[i] += a * X[i];
   }
 
-  free(A); free(B); free(C);
+  free(X); free(Y);
 }
