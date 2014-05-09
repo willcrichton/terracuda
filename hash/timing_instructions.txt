@@ -1,0 +1,23 @@
+Dictionary files:
+dict.txt, dict1.txt, dict3-4.txt are all basic, 1-5 line files for simple testing
+dict350k.txt - 350k words
+dict2mil.txt - recommended, 2 million words wheeeeeeeeee
+
+
+To time the appropriate languages:
+
+TERRA:
+
+terra/sha_lua.lua dictionary_file
+
+C:
+
+./sha1-c/sha1 dictionary_file
+
+TERRACUDA:
+
+terra hash.lua dictionary_file
+
+CUDA:
+
+raise NotYetImplemented

@@ -12,7 +12,7 @@ local cuda = terralib.require("cudalib")
 local C = terralib.includec('stdlib.h')
 local Cio = terralib.includec('stdio.h')
 
-terra bytes_to_word(a : int8, b : int8, c : int8, d : int8)
+terra bytes_to_word(a : uint8, b : uint8, c : uint8, d : uint8)
    return a*0x1000000 + b*0x10000 + c*0x100 + d
 end
 
@@ -21,27 +21,35 @@ terra hash_all(n : int)
 end
 
 terra pack_and_send(msg : &int8, idx : int, len : int, total : int)
-   Cio.printf("Original message: %s\n", msg)
+   --Cio.printf("Original message: %s\n", msg)
    var tmp_msg : uint32[16]
    var msg_idx = 16*(idx-1)
 
-   var zeroed_msg : int8[64]
+   var zeroed_msg : uint8[64]
    for i=0,63 do
-      if i <= len then
+      if i < len then
          zeroed_msg[i] = msg[i]
       else
          zeroed_msg[i] = 0
       end
    end
+   zeroed_msg[len] = 0x80
 
    for i=0,16 do
-      Cio.printf("%x %x %x %x\n", zeroed_msg[4*i], zeroed_msg[4*i+1], zeroed_msg[4*i+2], zeroed_msg[4*i+3])
-      var j = [uint32](bytes_to_word(msg[4*i], msg[4*i+1], msg[4*i+2], msg[4*i+3]))
-      tmp_msg[msg_idx+i] = j
+      var j = [uint32](bytes_to_word(zeroed_msg[4*i],
+                                     zeroed_msg[4*i+1],
+                                     zeroed_msg[4*i+2],
+                                     zeroed_msg[4*i+3]))
+      tmp_msg[i] = j
    end
-   tmp_msg[15] = len
+   tmp_msg[15] = len*8
    for i=0,16 do
-      assert(msg_idx+i < 16*total)
+      --[[
+      if i%4 ==0 and i > 0 then
+         Cio.printf("\n")
+      end
+      Cio.printf("0x%x\t", tmp_msg[i])
+      --]]
       params.msgs[msg_idx+i] = tmp_msg[i]
    end
 end
@@ -65,21 +73,20 @@ function prepack_input()
    end
    setup_params(total_msgs)
    for i,line in ipairs(lines) do
-         print("packing and sending idx", i, string.len(line), total_msgs)
+         --print("\n", i, "\n")
          pack_and_send(line, i, string.len(line), total_msgs)
    end
 end
 
 terra print_results(total : int)
-   Cio.printf("c3\n")
-   Cio.printf("%d\n\n", total)
+   Cio.printf("\nResults:\n\n")
    for i=0,5*total do
       if i%5 == 0 and i > 0 then
          Cio.printf("\n")
       end
       Cio.printf("%x\t", params.results[i])
    end
-   Cio.printf("\n c4\n")
+   Cio.printf("\n")
 end
 
 function file_exists(file)
@@ -89,9 +96,7 @@ function file_exists(file)
 end
 
 function main()
-   print("Hey there squirelly bear")
    prepack_input()
-   print("Starting")
    hash_all(#lines)
    print("Done")
    print_results(#lines)

@@ -2,11 +2,11 @@ local cuda = terralib.require("cudalib")
 local C = terralib.includec('stdio.h')
 local sha1 = {}
 
-terra rot_left(x : int, n : int)
+terra rot_left(x : uint, n : int)
    return (x << n) or (x >> (32-n))
 end
 
-terra f(t : int, b : int, c : int , d : int)
+terra f(t : int, b : uint, c : uint , d : uint)
    if t <= 19 then
       return (b and c) or ((not b) and d)
    elseif t <= 39 then
@@ -32,11 +32,9 @@ end
 
 -- computes the sha1 hash of a single message
 terra sha1_hash(params : &Params, idx : int)
-   --[[
-
    -- just to be sure
    if idx >= params.num_msgs then
-      return 0
+      return
    end
    var mask : uint = 0x0000000F
    var H0 : uint = 0x67452301
@@ -66,13 +64,23 @@ terra sha1_hash(params : &Params, idx : int)
    params.results[idx*5 + 2] = H2
    params.results[idx*5 + 3] = H3
    params.results[idx*5 + 4] = H4
-   --]]
 end
 
 local sha_kernel = cuda.make_kernel(sha1_hash)
 
+local T = terralib.includec('sys/time.h')
+
+
 sha1.hash = terra(params : Params)
+   var tv : T.timeval, tz : T.timezone
+   T.gettimeofday(&tv, &tz)
+   var start = tv.tv_sec + tv.tv_usec / 1000000.0
+
    sha_kernel(&params, params.num_msgs)
+
+   T.gettimeofday(&tv, &tz)
+   var after = tv.tv_sec + tv.tv_usec / 1000000.0
+   C.printf("Hash time: %f\n", after - start);
 end
 
 return sha1
