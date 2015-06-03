@@ -8,11 +8,11 @@
     <script src="jquery.smooth-scroll.min.js"></script>
     <script src="prism.js"></script>
     <script>
-    $(window).load(function() { 
-       $('#start').css('min-height', window.innerHeight); 
-       $('pre, code').attr('class', 'language-terra');    
+    $(window).load(function() {
+       $('#start').css('min-height', window.innerHeight);
+       $('pre, code').attr('class', 'language-terra');
        Prism.highlightAll();
-       $('#links a').smoothScroll();                 
+       $('#links a').smoothScroll();
      });
     </script>
   </head>
@@ -39,13 +39,13 @@
       <h2>Background</h2>
 
       <p>Writing GPU code is time-consuming. CUDA, the best available language for GPU programming, requires a lot of work from the programmer in order to do even simple tasks. The programmer must remember to keep host memory and device memory in sync. He must calculate the number of threads and warps he needs (and the term "warp" is quite confusing if you haven't heard it before). He must calculate for himself the appropriate index at each instance of his kernel. And most importantly, he can only write GPU code in CUDA!</p>
-      <p>Some APIs like <a href="http://documen.tician.de/pycuda/">PyCUDA</a> and <a href="http://www.jcuda.org/samples/samples.html">JCuda</a> attempted to tackle this problem. Unfortunately, they only address the last point raised above&mdash;one can use CUDA functions in the course of writing a Python program, but it is neither easy nor intuitive. In PyCUDA, for example, one must actually embed CUDA code as a string inside of the Python program (or presumably load it from a file). Terracuda's goal was to abstract away all these issues and let the programmer write GPU code at his convenience.</p>
+      <p>Some APIs like <a href="http://documen.tician.de/pycuda/">PyCUDA</a> and <a href="http://www.jcuda.org/samples/samples.html">JCuda</a> have attempted to tackle this problem. Unfortunately, they only address the last point raised above&mdash;one can use CUDA functions in the course of writing a Python program, but it is neither easy nor intuitive. In PyCUDA, for example, one must actually embed CUDA code as a string inside of the Python program. Terracuda's goal is to abstract away all these issues and let the programmer write GPU code at his convenience.</p>
 
 
       <h2>Approach</h2>
-      <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. <a href="http://terralang.org">Terra</a> is a language embedded in Lua which gives easier access to low-level functions (e.g. <code>printf</code>).</p>
+      <p><a href="http://www.lua.org/">Lua</a> is a fast, lightweight, and embeddable scripting language found in places like Wikipedia, World of Warcraft, Photoshop Lightroom, and more. Lua's simple syntax and dynamic typing also make it an ideal language for novice programmers. <a href="http://terralang.org">Terra</a> is a language embedded in Lua which gives easier access to low-level functions (e.g. <code>malloc</code>).</p>
 
-      <p>Terra has a few key features we used: it JIT-compiles to LLVM, it interoperates with Lua, and its types are treated as values in Lua. This combined with the recent release of NVIDIA's <a href="http://llvm.org/docs/NVPTXUsage.html">NVPTX</a> LLVM backend means that we can easily translate between Terra code and CUDA code. Its interoperation means that any Lua value can be used in Terra code, and its type system means that Lua can generate dynamics types on the fly.</p>
+      <p>Terra has a few key features we used: it JIT-compiles to LLVM, it interoperates with Lua, and its types are treated as values in Lua. This combined with the recent release of NVIDIA's <a href="http://llvm.org/docs/NVPTXUsage.html">NVPTX</a> LLVM backend means that we can easily translate between Terra code and CUDA code. Its interoperation means that any Lua value can be used in Terra code, and its type system means that Lua can generate dynamic types on the fly.</p>
       <p>Before we delve into the specifics of the API, let's look at a sample implementation of the <code>SAXPY</code> routine in regular Lua and using Terracuda.</p>
       <div style="overflow: auto; margin-top: 20px;">
         <div style="float:left;">
@@ -54,7 +54,7 @@
 -- populate X and Y
 
 for i = 1, N do
-   P.Y[i] = P.A * P.X[i] + P.Y[i]
+   P.Y[i] = P.a * P.X[i] + P.Y[i]
 end</code></pre>
         </div>
         <div style="float:left; margin-left: 20px;">
@@ -71,15 +71,15 @@ end)
 saxpy(P, N)</code></pre>
         </div>
       </div>
-      
+
       <p>Both pieces of code above will produce the same output (i.e. <code>P.C</code> will contain the correct values). You may notice, however, that device memory, thread indexing, kernel calls, etc. are all conspicuously absent from the Terracuda code. This is all handled by the API. Here's how it works: consider that you have some table <code>P</code> and a Terra function <code>F</code> that operates on <code>P</code> which you want to convert to GPU code. The process is as follows:</p>
       <ol>
-        <li>Run <code>make_struct_type(P)</code>. Because Terra types are values, Lua can loop through <code>P</code> and generate a new <code>struct</code> type that corresponds exactly with the given input. So in the above <code>SAXPY</code> example, the generated type is <code>struct P { X: &int, Y: &int, a: double }</code>.</li>
+        <li>Run <code>make_struct_type(P)</code>. Because Terra types are Lua values, Lua can loop through <code>P</code> and generate a new <code>struct</code> type that corresponds exactly with the given input. So in the above <code>SAXPY</code> example, the generated type is <code>struct P { X: &int, Y: &int, a: double }</code>.</li>
         <li>Run <code>make_kernel(F)</code>. This pre-allocates device memory for every entry inside the struct if possible (the exception being if we have variable length arrays). Then, it JIT-compiles <code>F</code> to CUDA code for later use. Lastly, <code>make_kernel</code> returns a closure over these values which will copy the input into the allocated device memory, run the kernel on the device parameters, and copy the modified memory back to the host.</li>
         <li>Run the result of <code>make_kernel</code> with your input parameters as well as the number of threads <code>N</code> to create.
       </ol>
-      
-      <p>This approach gives great freedom to Terracuda users, as essentially any CUDA program can be translated to Terracuda without much trouble. Note that Terracuda is <em>not</em> purely data-parallel&mdash;you can run your kernel over any number of threads with any input! The flexibility of the API has actually changed significantly over time. Initially, we wrote the API just in terms of data-parallel primitives like <code>map</code> and <code>reduce</code>, but over time as we learned more about Terra we realized that it empowers us to write more flexible code, and consequently we added more features to the API like struct type creation. For example, matrix multiply looked like this:
+
+      <p>This approach gives great freedom to Terracuda users, as essentially any CUDA program can be translated to Terracuda without much trouble. Note that Terracuda is <em>not</em> purely data-parallel&mdash;you can run your kernel over any number of threads with any input! Initially, we wrote the API just in terms of data-parallel primitives like <code>map</code> and <code>reduce</code>, but over time as we learned more about Terra we realized that it empowers us to write more flexible code, and consequently we added more features to the API like struct type creation. For example, matrix multiply looks like this:
         <pre><code>local P = {A = {}, B = {}, C = {}, N = 1000}
 -- populate A and B
 
@@ -125,8 +125,8 @@ kernel(A)</code></pre>
       <p>DeVito, Zachary et al. <em>Terra: A Multi-Stage Language for High-Performance Computing</em>. 2013. <br />
         Ierusalimschy, Roberto. <em>Programming in Lua: Third Edition</em>. Lua.org, Jan 2013.
       </p>
-      
-      
+
+
       <h2>Work done</h2>
       <p>Equal work was performed by both project members.</p>
 
