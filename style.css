@@ -1,12 +1,15 @@
 * { margin: 0; padding: 0; }
 
 body {
-    font-family: 'Raleway', sans-srif;
+    font-family: 'Helvetica Neue', Arial, sans-srif;
     color: #e8e8e8;
     background: rgb(32, 32, 56);
 }
 
+h1, h2, h3, h4 { font-family: 'Raleway', sans-serif; }
+
 #start {
+    font-family: 'Raleway', sans-serif;
     background: url('bg.jpg') no-repeat center center;
     background-size: cover;
     width: 100%;
@@ -77,8 +80,8 @@ ul, ol {
     margin: 5px 20px;
 }
 
-pre { 
-    background: #f8f8f8; 
+pre {
+    background: #f8f8f8;
     margin: 20px 0!important;
 }
 
